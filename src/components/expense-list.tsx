@@ -3,12 +3,12 @@
 import { useMemo } from "react";
 
 type Expense = {
-  _id: string;
+  id: number;
   amount: number;
   description: string;
   category: string;
   date: string;
-  aiSuggested?: boolean;
+  aiSuggested?: boolean | null;
 };
 
 export function ExpenseList({ expenses }: { expenses: Expense[] }) {
@@ -33,7 +33,7 @@ export function ExpenseList({ expenses }: { expenses: Expense[] }) {
     <div className="space-y-3">
       {expenses.map((expense) => (
         <div
-          key={expense._id}
+          key={expense.id}
           className="flex items-center justify-between rounded-3xl border border-foreground/10 bg-white/70 px-5 py-4 shadow-sm"
         >
           <div className="space-y-1">
@@ -49,7 +49,7 @@ export function ExpenseList({ expenses }: { expenses: Expense[] }) {
             </div>
             <div className="flex items-center gap-3 text-xs text-foreground/50">
               <span>{expense.category}</span>
-              <span>•</span>
+              <span>-</span>
               <span>{expense.date}</span>
             </div>
           </div>
@@ -61,3 +61,4 @@ export function ExpenseList({ expenses }: { expenses: Expense[] }) {
     </div>
   );
 }
+

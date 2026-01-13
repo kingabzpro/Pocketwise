@@ -1,17 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { useAction, useConvexAuth, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExpenseList } from "@/components/expense-list";
 import { InsightsSummary } from "@/components/insights-summary";
 
+type Expense = {
+  id: number;
+  amount: number;
+  description: string;
+  category: string;
+  date: string;
+  aiSuggested?: boolean | null;
+};
+
+type Summary = {
+  total: number;
+  byCategory: { category: string; amount: number }[];
+};
+
 export function DashboardClient() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isLoaded, isSignedIn } = useUser();
   const today = useMemo(() => new Date(), []);
   const monthStart = useMemo(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
@@ -20,12 +33,64 @@ export function DashboardClient() {
   const [category, setCategory] = useState("All");
   const [from, setFrom] = useState(monthStart.toISOString().slice(0, 10));
   const [to, setTo] = useState(today.toISOString().slice(0, 10));
+  const [categories, setCategories] = useState<string[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [summary, setSummary] = useState<Summary>({
+    total: 0,
+    byCategory: [],
+  });
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isSignedIn) {
+      return;
+    }
+    void fetch("/api/categories")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCategories(data);
+        }
+      });
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (category !== "All") {
+      params.set("category", category);
+    }
+    if (from) {
+      params.set("from", from);
+    }
+    if (to) {
+      params.set("to", to);
+    }
+    const search = params.toString();
+
+    void fetch(`/api/expenses${search ? `?${search}` : ""}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setExpenses(data);
+        }
+      });
+
+    void fetch(`/api/expenses/summary${search ? `?${search}` : ""}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data) {
+          setSummary(data);
+        }
+      });
+  }, [category, from, to, isSignedIn]);
+
+  if (!isLoaded) {
     return null;
   }
 
-  if (!isAuthenticated) {
+  if (!isSignedIn) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 pb-20 pt-10">
         <div className="rounded-3xl border border-foreground/10 bg-white/80 p-8 text-sm text-foreground/60">
@@ -39,22 +104,21 @@ export function DashboardClient() {
     );
   }
 
-  const categories = useQuery(api.categories.list) ?? [];
-  const expenses =
-    useQuery(api.expenses.list, {
-      category: category === "All" ? undefined : category,
-      from,
-      to,
-    }) ?? [];
-  const summary = useQuery(api.expenses.summary, { from, to }) ?? {
-    total: 0,
-    byCategory: [],
-  };
-
-  const exportCsv = useAction(api.expenses.exportCsv);
-
   const handleExport = async () => {
-    const csv = await exportCsv({ from, to });
+    const params = new URLSearchParams();
+    if (from) {
+      params.set("from", from);
+    }
+    if (to) {
+      params.set("to", to);
+    }
+    const response = await fetch(
+      `/api/expenses/export${params.toString() ? `?${params.toString()}` : ""}`
+    );
+    if (!response.ok) {
+      return;
+    }
+    const csv = await response.text();
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

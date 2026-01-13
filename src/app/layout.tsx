@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Space_Grotesk } from "next/font/google";
-import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
-import { ConvexClientProvider } from "@/components/convex-client-provider";
+import { ClerkProvider } from "@clerk/nextjs";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -27,17 +26,15 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}
-      >
-        <ConvexAuthNextjsServerProvider>
-          <ConvexClientProvider>
-            <SiteHeader />
-            {children}
-          </ConvexClientProvider>
-        </ConvexAuthNextjsServerProvider>
-      </body>
-    </html>
+    <ClerkProvider signInUrl="/login">
+      <html lang="en">
+        <body
+          className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}
+        >
+          <SiteHeader />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

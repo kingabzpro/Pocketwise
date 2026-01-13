@@ -1,16 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function ImportPage() {
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const importCsv = useAction(api.imports.importCsv);
+  const { isLoaded, isSignedIn } = useUser();
   const [status, setStatus] = useState<string | null>(null);
   const [count, setCount] = useState<number | null>(null);
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 pb-20 pt-10">
+        <div className="rounded-3xl border border-foreground/10 bg-white/80 p-8 text-sm text-foreground/60">
+          Please{" "}
+          <Link href="/login" className="underline">
+            sign in
+          </Link>{" "}
+          to import expenses.
+        </div>
+      </main>
+    );
+  }
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,13 +44,11 @@ export default function ImportPage() {
     }
 
     setStatus("Uploading...");
-    const uploadUrl = await generateUploadUrl();
-    const response = await fetch(uploadUrl, {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/api/import", {
       method: "POST",
-      headers: {
-        "Content-Type": file.type || "text/csv",
-      },
-      body: file,
+      body: formData,
     });
 
     if (!response.ok) {
@@ -41,9 +56,7 @@ export default function ImportPage() {
       return;
     }
 
-    const { storageId } = (await response.json()) as { storageId: string };
-    setStatus("Importing...");
-    const imported = await importCsv({ storageId });
+    const { count: imported } = (await response.json()) as { count: number };
     setCount(imported);
     setStatus("Done.");
     form.reset();
